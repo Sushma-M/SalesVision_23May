@@ -19,10 +19,12 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.wavemaker.runtime.data.exception.EntityNotFoundException;
+import com.wavemaker.commons.wrapper.StringWrapper;
+import com.wavemaker.runtime.data.export.ExportOptions;
 import com.wavemaker.runtime.data.export.ExportType;
 import com.wavemaker.runtime.data.expression.QueryFilter;
 import com.wavemaker.runtime.data.model.AggregationInfo;
+import com.wavemaker.runtime.file.manager.ExportedFileManager;
 import com.wavemaker.runtime.file.model.Downloadable;
 import com.wavemaker.tools.api.core.annotations.WMAccessVisibility;
 import com.wavemaker.tools.api.core.models.AccessSpecifier;
@@ -49,6 +51,9 @@ public class FollowUpsController {
 	@Qualifier("salesdb.FollowUpsService")
 	private FollowUpsService followUpsService;
 
+	@Autowired
+	private ExportedFileManager exportedFileManager;
+
 	@ApiOperation(value = "Creates a new FollowUps instance.")
     @RequestMapping(method = RequestMethod.POST)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
@@ -64,7 +69,7 @@ public class FollowUpsController {
     @ApiOperation(value = "Returns the FollowUps instance associated with the given id.")
     @RequestMapping(value = "/{id:.+}", method = RequestMethod.GET)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
-    public FollowUps getFollowUps(@PathVariable("id") Integer id) throws EntityNotFoundException {
+    public FollowUps getFollowUps(@PathVariable("id") Integer id) {
         LOGGER.debug("Getting FollowUps with id: {}" , id);
 
         FollowUps foundFollowUps = followUpsService.getById(id);
@@ -76,7 +81,7 @@ public class FollowUpsController {
     @ApiOperation(value = "Updates the FollowUps instance associated with the given id.")
     @RequestMapping(value = "/{id:.+}", method = RequestMethod.PUT)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
-    public FollowUps editFollowUps(@PathVariable("id") Integer id, @RequestBody FollowUps followUps) throws EntityNotFoundException {
+    public FollowUps editFollowUps(@PathVariable("id") Integer id, @RequestBody FollowUps followUps) {
         LOGGER.debug("Editing FollowUps with id: {}" , followUps.getId());
 
         followUps.setId(id);
@@ -89,7 +94,7 @@ public class FollowUpsController {
     @ApiOperation(value = "Deletes the FollowUps instance associated with the given id.")
     @RequestMapping(value = "/{id:.+}", method = RequestMethod.DELETE)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
-    public boolean deleteFollowUps(@PathVariable("id") Integer id) throws EntityNotFoundException {
+    public boolean deleteFollowUps(@PathVariable("id") Integer id) {
         LOGGER.debug("Deleting FollowUps with id: {}" , id);
 
         FollowUps deletedFollowUps = followUpsService.delete(id);
@@ -105,7 +110,7 @@ public class FollowUpsController {
     @RequestMapping(value = "/search", method = RequestMethod.POST)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Page<FollowUps> searchFollowUpsByQueryFilters( Pageable pageable, @RequestBody QueryFilter[] queryFilters) {
-        LOGGER.debug("Rendering FollowUps list");
+        LOGGER.debug("Rendering FollowUps list by query filter:{}", (Object) queryFilters);
         return followUpsService.findAll(queryFilters, pageable);
     }
 
@@ -113,7 +118,7 @@ public class FollowUpsController {
     @RequestMapping(method = RequestMethod.GET)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Page<FollowUps> findFollowUps(@ApiParam("conditions to filter the results") @RequestParam(value = "q", required = false) String query, Pageable pageable) {
-        LOGGER.debug("Rendering FollowUps list");
+        LOGGER.debug("Rendering FollowUps list by filter:", query);
         return followUpsService.findAll(query, pageable);
     }
 
@@ -121,7 +126,7 @@ public class FollowUpsController {
     @RequestMapping(value="/filter", method = RequestMethod.POST, consumes= "application/x-www-form-urlencoded")
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Page<FollowUps> filterFollowUps(@ApiParam("conditions to filter the results") @RequestParam(value = "q", required = false) String query, Pageable pageable) {
-        LOGGER.debug("Rendering FollowUps list");
+        LOGGER.debug("Rendering FollowUps list by filter", query);
         return followUpsService.findAll(query, pageable);
     }
 
@@ -130,6 +135,14 @@ public class FollowUpsController {
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Downloadable exportFollowUps(@PathVariable("exportType") ExportType exportType, @ApiParam("conditions to filter the results") @RequestParam(value = "q", required = false) String query, Pageable pageable) {
          return followUpsService.export(exportType, query, pageable);
+    }
+
+    @ApiOperation(value = "Returns a URL to download a file for the data matching the optional query (q) request param and the required fields provided in the Export Options.") 
+    @RequestMapping(value = "/export", method = {RequestMethod.POST}, consumes = "application/json")
+    @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
+    public StringWrapper exportFollowUpsAndGetURL(@RequestBody ExportOptions options, Pageable pageable) {
+        String url = exportedFileManager.registerAndGetURL(FollowUps.class.getSimpleName() + options.getExportType().getExtension(), outputStream -> followUpsService.export(options, pageable, outputStream));
+        return new StringWrapper(url);
     }
 
 	@ApiOperation(value = "Returns the total count of FollowUps instances matching the optional query (q) request param. If query string is too big to fit in GET request's query param, use POST method with application/x-www-form-urlencoded format.")
@@ -159,4 +172,3 @@ public class FollowUpsController {
 	}
 
 }
-

@@ -19,10 +19,12 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.wavemaker.runtime.data.exception.EntityNotFoundException;
+import com.wavemaker.commons.wrapper.StringWrapper;
+import com.wavemaker.runtime.data.export.ExportOptions;
 import com.wavemaker.runtime.data.export.ExportType;
 import com.wavemaker.runtime.data.expression.QueryFilter;
 import com.wavemaker.runtime.data.model.AggregationInfo;
+import com.wavemaker.runtime.file.manager.ExportedFileManager;
 import com.wavemaker.runtime.file.model.Downloadable;
 import com.wavemaker.tools.api.core.annotations.WMAccessVisibility;
 import com.wavemaker.tools.api.core.models.AccessSpecifier;
@@ -50,6 +52,9 @@ public class ChannelsController {
 	@Qualifier("salesdb.ChannelsService")
 	private ChannelsService channelsService;
 
+	@Autowired
+	private ExportedFileManager exportedFileManager;
+
 	@ApiOperation(value = "Creates a new Channels instance.")
     @RequestMapping(method = RequestMethod.POST)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
@@ -65,7 +70,7 @@ public class ChannelsController {
     @ApiOperation(value = "Returns the Channels instance associated with the given id.")
     @RequestMapping(value = "/{id:.+}", method = RequestMethod.GET)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
-    public Channels getChannels(@PathVariable("id") Integer id) throws EntityNotFoundException {
+    public Channels getChannels(@PathVariable("id") Integer id) {
         LOGGER.debug("Getting Channels with id: {}" , id);
 
         Channels foundChannels = channelsService.getById(id);
@@ -77,7 +82,7 @@ public class ChannelsController {
     @ApiOperation(value = "Updates the Channels instance associated with the given id.")
     @RequestMapping(value = "/{id:.+}", method = RequestMethod.PUT)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
-    public Channels editChannels(@PathVariable("id") Integer id, @RequestBody Channels channels) throws EntityNotFoundException {
+    public Channels editChannels(@PathVariable("id") Integer id, @RequestBody Channels channels) {
         LOGGER.debug("Editing Channels with id: {}" , channels.getId());
 
         channels.setId(id);
@@ -90,7 +95,7 @@ public class ChannelsController {
     @ApiOperation(value = "Deletes the Channels instance associated with the given id.")
     @RequestMapping(value = "/{id:.+}", method = RequestMethod.DELETE)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
-    public boolean deleteChannels(@PathVariable("id") Integer id) throws EntityNotFoundException {
+    public boolean deleteChannels(@PathVariable("id") Integer id) {
         LOGGER.debug("Deleting Channels with id: {}" , id);
 
         Channels deletedChannels = channelsService.delete(id);
@@ -106,7 +111,7 @@ public class ChannelsController {
     @RequestMapping(value = "/search", method = RequestMethod.POST)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Page<Channels> searchChannelsByQueryFilters( Pageable pageable, @RequestBody QueryFilter[] queryFilters) {
-        LOGGER.debug("Rendering Channels list");
+        LOGGER.debug("Rendering Channels list by query filter:{}", (Object) queryFilters);
         return channelsService.findAll(queryFilters, pageable);
     }
 
@@ -114,7 +119,7 @@ public class ChannelsController {
     @RequestMapping(method = RequestMethod.GET)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Page<Channels> findChannels(@ApiParam("conditions to filter the results") @RequestParam(value = "q", required = false) String query, Pageable pageable) {
-        LOGGER.debug("Rendering Channels list");
+        LOGGER.debug("Rendering Channels list by filter:", query);
         return channelsService.findAll(query, pageable);
     }
 
@@ -122,7 +127,7 @@ public class ChannelsController {
     @RequestMapping(value="/filter", method = RequestMethod.POST, consumes= "application/x-www-form-urlencoded")
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Page<Channels> filterChannels(@ApiParam("conditions to filter the results") @RequestParam(value = "q", required = false) String query, Pageable pageable) {
-        LOGGER.debug("Rendering Channels list");
+        LOGGER.debug("Rendering Channels list by filter", query);
         return channelsService.findAll(query, pageable);
     }
 
@@ -131,6 +136,14 @@ public class ChannelsController {
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Downloadable exportChannels(@PathVariable("exportType") ExportType exportType, @ApiParam("conditions to filter the results") @RequestParam(value = "q", required = false) String query, Pageable pageable) {
          return channelsService.export(exportType, query, pageable);
+    }
+
+    @ApiOperation(value = "Returns a URL to download a file for the data matching the optional query (q) request param and the required fields provided in the Export Options.") 
+    @RequestMapping(value = "/export", method = {RequestMethod.POST}, consumes = "application/json")
+    @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
+    public StringWrapper exportChannelsAndGetURL(@RequestBody ExportOptions options, Pageable pageable) {
+        String url = exportedFileManager.registerAndGetURL(Channels.class.getSimpleName() + options.getExportType().getExtension(), outputStream -> channelsService.export(options, pageable, outputStream));
+        return new StringWrapper(url);
     }
 
 	@ApiOperation(value = "Returns the total count of Channels instances matching the optional query (q) request param. If query string is too big to fit in GET request's query param, use POST method with application/x-www-form-urlencoded format.")
@@ -168,4 +181,3 @@ public class ChannelsController {
 	}
 
 }
-

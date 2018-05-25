@@ -19,10 +19,12 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.wavemaker.runtime.data.exception.EntityNotFoundException;
+import com.wavemaker.commons.wrapper.StringWrapper;
+import com.wavemaker.runtime.data.export.ExportOptions;
 import com.wavemaker.runtime.data.export.ExportType;
 import com.wavemaker.runtime.data.expression.QueryFilter;
 import com.wavemaker.runtime.data.model.AggregationInfo;
+import com.wavemaker.runtime.file.manager.ExportedFileManager;
 import com.wavemaker.runtime.file.model.Downloadable;
 import com.wavemaker.tools.api.core.annotations.WMAccessVisibility;
 import com.wavemaker.tools.api.core.models.AccessSpecifier;
@@ -49,6 +51,9 @@ public class Table2Controller {
 	@Qualifier("MyTestDatabase.Table2Service")
 	private Table2Service table2Service;
 
+	@Autowired
+	private ExportedFileManager exportedFileManager;
+
 	@ApiOperation(value = "Creates a new Table2 instance.")
     @RequestMapping(method = RequestMethod.POST)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
@@ -64,7 +69,7 @@ public class Table2Controller {
     @ApiOperation(value = "Returns the Table2 instance associated with the given id.")
     @RequestMapping(value = "/{id:.+}", method = RequestMethod.GET)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
-    public Table2 getTable2(@PathVariable("id") Integer id) throws EntityNotFoundException {
+    public Table2 getTable2(@PathVariable("id") Integer id) {
         LOGGER.debug("Getting Table2 with id: {}" , id);
 
         Table2 foundTable2 = table2Service.getById(id);
@@ -76,7 +81,7 @@ public class Table2Controller {
     @ApiOperation(value = "Updates the Table2 instance associated with the given id.")
     @RequestMapping(value = "/{id:.+}", method = RequestMethod.PUT)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
-    public Table2 editTable2(@PathVariable("id") Integer id, @RequestBody Table2 table2) throws EntityNotFoundException {
+    public Table2 editTable2(@PathVariable("id") Integer id, @RequestBody Table2 table2) {
         LOGGER.debug("Editing Table2 with id: {}" , table2.getId());
 
         table2.setId(id);
@@ -89,7 +94,7 @@ public class Table2Controller {
     @ApiOperation(value = "Deletes the Table2 instance associated with the given id.")
     @RequestMapping(value = "/{id:.+}", method = RequestMethod.DELETE)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
-    public boolean deleteTable2(@PathVariable("id") Integer id) throws EntityNotFoundException {
+    public boolean deleteTable2(@PathVariable("id") Integer id) {
         LOGGER.debug("Deleting Table2 with id: {}" , id);
 
         Table2 deletedTable2 = table2Service.delete(id);
@@ -105,7 +110,7 @@ public class Table2Controller {
     @RequestMapping(value = "/search", method = RequestMethod.POST)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Page<Table2> searchTable2sByQueryFilters( Pageable pageable, @RequestBody QueryFilter[] queryFilters) {
-        LOGGER.debug("Rendering Table2s list");
+        LOGGER.debug("Rendering Table2s list by query filter:{}", (Object) queryFilters);
         return table2Service.findAll(queryFilters, pageable);
     }
 
@@ -113,7 +118,7 @@ public class Table2Controller {
     @RequestMapping(method = RequestMethod.GET)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Page<Table2> findTable2s(@ApiParam("conditions to filter the results") @RequestParam(value = "q", required = false) String query, Pageable pageable) {
-        LOGGER.debug("Rendering Table2s list");
+        LOGGER.debug("Rendering Table2s list by filter:", query);
         return table2Service.findAll(query, pageable);
     }
 
@@ -121,7 +126,7 @@ public class Table2Controller {
     @RequestMapping(value="/filter", method = RequestMethod.POST, consumes= "application/x-www-form-urlencoded")
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Page<Table2> filterTable2s(@ApiParam("conditions to filter the results") @RequestParam(value = "q", required = false) String query, Pageable pageable) {
-        LOGGER.debug("Rendering Table2s list");
+        LOGGER.debug("Rendering Table2s list by filter", query);
         return table2Service.findAll(query, pageable);
     }
 
@@ -130,6 +135,14 @@ public class Table2Controller {
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Downloadable exportTable2s(@PathVariable("exportType") ExportType exportType, @ApiParam("conditions to filter the results") @RequestParam(value = "q", required = false) String query, Pageable pageable) {
          return table2Service.export(exportType, query, pageable);
+    }
+
+    @ApiOperation(value = "Returns a URL to download a file for the data matching the optional query (q) request param and the required fields provided in the Export Options.") 
+    @RequestMapping(value = "/export", method = {RequestMethod.POST}, consumes = "application/json")
+    @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
+    public StringWrapper exportTable2sAndGetURL(@RequestBody ExportOptions options, Pageable pageable) {
+        String url = exportedFileManager.registerAndGetURL(Table2.class.getSimpleName() + options.getExportType().getExtension(), outputStream -> table2Service.export(options, pageable, outputStream));
+        return new StringWrapper(url);
     }
 
 	@ApiOperation(value = "Returns the total count of Table2 instances matching the optional query (q) request param. If query string is too big to fit in GET request's query param, use POST method with application/x-www-form-urlencoded format.")
@@ -159,4 +172,3 @@ public class Table2Controller {
 	}
 
 }
-

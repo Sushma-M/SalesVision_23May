@@ -22,12 +22,9 @@ import com.salesvision2_0.mytestdatabase.service.MyTestDatabaseProcedureExecutor
 @Api(value = "ProcedureExecutionController", description = "controller class for procedure execution")
 public class ProcedureExecutionController {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(ProcedureExecutionController.class);
 
     @Autowired
     private MyTestDatabaseProcedureExecutorService procedureService;
 
 
 }
-
-

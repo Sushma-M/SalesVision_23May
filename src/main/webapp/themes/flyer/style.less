@@ -67,7 +67,12 @@
   label {
     font-weight: normal;
   }
-
+  .btn-secondary {
+    &:hover, &:focus {
+      background-color: rgba(0,0,0,0.25);
+      color: @text-color;
+    }
+  }
   .h1,.h2,.h3,.h4,.h5,.h6 {
     width: 100%;
   }
@@ -84,7 +89,7 @@
   .nav-tabs {
     border-bottom-color: transparent;
     > li {
-      > a, .app-menu a {
+      > a {
         color: @text-color;
         background-color: transparent;
         border-bottom-color: transparent;
@@ -96,23 +101,27 @@
         &:hover, &:focus {
           color: inherit;
           background-color: @nav-tabs-active-link-hover-bg;
-          font-weight: bold; 
           border-color: transparent;
         }
       }
       &.active {
-        > a, .app-menu a {
+        > a {
           background-color: @nav-tabs-active-link-hover-bg;
-          font-weight: bold; 
           border-color: transparent;
           color: inherit;
           &:hover {
             border-color: transparent;
             color: inherit;
-            font-weight: bold; 
             background-color: @nav-tabs-active-link-hover-bg;
           }
         }
+      }
+      //Default styles for menu in nav
+      &.app-nav-item > .dropdown > a.dropdown-toggle {
+        padding: @nav-link-padding;
+        color: @text-color;
+        text-transform: uppercase;
+        line-height: 1.42857143;
       }
     }
   }
@@ -141,7 +150,7 @@
     }
   }
   .checkbox , .radio {
-      padding: @padding-base-vertical @padding-base-horizontal 0 @padding-base-horizontal;
+      padding: 0 @padding-base-horizontal;
   }
   //filter
   .app-livefilter, .app-form {
@@ -226,7 +235,8 @@
   .app-header, .app-mobile-header {
     background-color: @wm-header-bg-color;
     color: @wm-header-text-color;
-    border-bottom: 1px solid @wm-header-border-color;
+    box-shadow: 0px 1px 0px rgba(0,0,0,0.2);
+    border-color: transparent;
     height: @wm-header-height;
 
     a {
@@ -244,17 +254,49 @@
   //Header box-shadow
   .app-header {
     .app-header-container {
-      -webkit-box-shadow: 0px 5px 5px rgba(0,0,0,0.1);
-      -moz-box-shadow: 0px 5px 5px rgba(0,0,0,0.1);
-      box-shadow: 0 5px 5px rgba(0,0,0,0.1);
       z-index: 1;
     }
   }
+
+  /****nav widget****/
+  .app-nav {
+    &.nav-pills {
+      .app-nav-item {
+        .app-menu {
+          .dropdown-toggle {
+            border-radius: @border-radius-base;
+            padding: @nav-link-padding;
+            &:hover {
+              color: @brand-primary;
+              background-color: @nav-link-hover-bg;
+            }
+          }
+          &.open {
+            .dropdown-toggle {
+              color: @nav-pills-active-link-hover-color;
+              background-color: @nav-pills-active-link-hover-bg;
+              &:active, &:active:hover {
+                color: @nav-pills-active-link-hover-color;
+                background-color: @nav-pills-active-link-hover-bg;
+              }
+            }
+          }
+        }
+      }
+    }
+    &.nav-justified {
+      .app-nav-item {
+        .app-menu {
+          text-align: center;
+        }
+      }
+    }
+  }
+
   //Top Nav Bar
   .app-navbar {
     border-radius: 0;
     border: 0;
-    background-color: @navbar-default-bg;
     color: @navbar-default-color;
 
     .navbar-nav {
@@ -292,6 +334,8 @@
         > .dropdown {
           a.dropdown-toggle {
             padding-right: 3em;
+            padding-top: 1.5em;
+            padding-bottom: 1.5em;
             color: inherit;
           }
         }
@@ -311,6 +355,24 @@
   .app-left-panel, .app-right-panel {
     .nav {
       li {
+        //for overriding the pills default color
+        &.active {
+          > a {
+            color: @brand-primary;
+            background-color: @wm-left-panel-link-hover-bg;
+            font-weight: bold;
+            .app-icon {
+              color: inherit;
+            }
+            &:hover, &:focus {
+              color: inherit;
+              background-color: @wm-left-panel-link-hover-bg;
+              .app-icon {
+                color: inherit;
+              }
+            }
+          }
+        }
         margin-top: 0;
         border-bottom: @wm-left-panel-list-border;
         a, .btn, .dropdown a, .dropdown a.dropdown-toggle, .app-popover a {
@@ -354,7 +416,9 @@
             margin-right: 0.417em;
           }
         }
-
+        .badge {
+          top: 2em !important;
+        }
         > .dropdown.open {
           > .dropdown-menu {
             position: relative;
@@ -492,6 +556,26 @@
           }
         }
       }
+      tbody {
+        tr {
+          &.active, &:hover {
+            td {
+              border-color: rgba(0,0,0,0.1);
+            }
+          }
+        }
+      }
+    }
+    //When table is condensed
+    .input-group.input-group-sm {
+      .input-group-addon {
+        padding: 0 4px;
+        .btn {
+          .app-icon {
+            font-size: 11px;
+          }
+        }
+      }
     }
   }
   //carousel styling: removing the left and right background image
@@ -506,9 +590,12 @@
     .app-accordion-panel {
       .panel-heading {
         .panel-actions {
-          color: @brand-primary;
+          color: @component-active-color;
           right: 1em;
         }
+      }
+      &.panel-default .panel-heading .panel-actions {
+        color: @component-active-bg;
       }
     }
   }
@@ -532,6 +619,7 @@
     //setting the base font color for the popup content
     .dropdown-menu {
       color: @text-color;
+      padding-top: 0;
     }
 
     thead {
@@ -556,9 +644,9 @@
         color: @text-color;
         width: auto;
         padding: 0.55em .83em;
-        &.btn-info, &.active{
-          background-color: @btn-info-bg;
-          color: @btn-info-color;
+        &.btn-info {
+          background-color: lighten(@brand-primary, 30%);
+          color: @text-color;
         }
         &:hover, &:focus &:active {
           background-color: @component-active-bg;
@@ -571,6 +659,7 @@
         }
         .text-info {
           color: @brand-primary;
+          font-weight: bold;
         }
       }
     }
@@ -597,8 +686,9 @@
   //Time Widget classes for styling the buttons
   .app-timeinput, .app-datetime {
     tbody {
-      .btn:not(.btn-link) {
-        border: 1px solid @input-border;
+      .am-pm .btn {
+          border: 1px solid @input-border;
+          padding: 8px 12px;
       }
       .btn-link {
         width: 100%;
@@ -628,12 +718,7 @@
         }
       }
     }
-    .fc-state-highlight {
-      &.fc-today {
-        background-color: @component-active-bg;
-        color: @component-active-color;
-      }
-    }
+
     .fc {
       .fc-toolbar {
         h2 {
@@ -641,20 +726,23 @@
         }
       }
     }
+    .fc-event {
+      background-color: @component-active-bg;
+      color: @component-active-color;
+    }
     .fc-widget-header {
       background-color: @body-bg;
       color: @text-color;
     }
     .fc-body {
       .fc-row {
-        min-height: 3em;
-        .fc-content-skeleton {
-          padding: .8em 0;
-          td {
-            text-align: center;
-          }
-        }
+        min-height: 5em;
       }
+    }
+    .fc-day-number {
+      padding: .5em .3em;
+      font-size: 1.52em;
+      text-align: left;
     }
   }
 /*********************************************************************************************************************************************/
@@ -737,6 +825,24 @@
     background-color: @wm-tile-bg;
     border-top: 3px solid @wm-tile-border-color;
     border-radius: 0;
+    &.bg-danger, &.bg-success, &.bg-info, &.bg-warning {
+      color: @panel-primary-text;
+    }
+    &.bg-primary {
+      background-color: @brand-primary;
+    }
+    &.bg-danger {
+      background-color: @brand-danger;
+    }
+    &.bg-success {
+      background-color: @brand-success;
+    }
+    &.bg-info {
+      background-color: @brand-info;
+    }
+    &.bg-warning {
+      background-color: @brand-warning;
+    }
   }
 
  /***Slider widget styling*******************/

@@ -7,7 +7,6 @@ import java.io.Serializable;
 import java.util.List;
 import java.util.Objects;
 
-import javax.persistence.CascadeType;
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.FetchType;
@@ -15,7 +14,11 @@ import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.OneToMany;
+import javax.persistence.PostPersist;
 import javax.persistence.Table;
+
+import org.hibernate.annotations.Cascade;
+import org.hibernate.annotations.CascadeType;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
@@ -132,13 +135,21 @@ public class Department implements Serializable {
     }
 
     @JsonInclude(Include.NON_EMPTY)
-    @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.REMOVE, mappedBy = "department")
+    @OneToMany(fetch = FetchType.LAZY, mappedBy = "department")
+    @Cascade({CascadeType.SAVE_UPDATE, CascadeType.REMOVE})
     public List<Employee> getEmployees() {
         return this.employees;
     }
 
     public void setEmployees(List<Employee> employees) {
         this.employees = employees;
+    }
+
+    @PostPersist
+    public void onPostPersist() {
+        if(employees != null) {
+            employees.forEach(employee -> employee.setDepartment(this));
+        }
     }
 
     @Override
@@ -154,4 +165,3 @@ public class Department implements Serializable {
         return Objects.hash(getDeptid());
     }
 }
-

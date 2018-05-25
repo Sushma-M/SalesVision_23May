@@ -19,10 +19,12 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.wavemaker.runtime.data.exception.EntityNotFoundException;
+import com.wavemaker.commons.wrapper.StringWrapper;
+import com.wavemaker.runtime.data.export.ExportOptions;
 import com.wavemaker.runtime.data.export.ExportType;
 import com.wavemaker.runtime.data.expression.QueryFilter;
 import com.wavemaker.runtime.data.model.AggregationInfo;
+import com.wavemaker.runtime.file.manager.ExportedFileManager;
 import com.wavemaker.runtime.file.model.Downloadable;
 import com.wavemaker.tools.api.core.annotations.WMAccessVisibility;
 import com.wavemaker.tools.api.core.models.AccessSpecifier;
@@ -49,6 +51,9 @@ public class SalesController {
 	@Qualifier("salesdb.SalesService")
 	private SalesService salesService;
 
+	@Autowired
+	private ExportedFileManager exportedFileManager;
+
 	@ApiOperation(value = "Creates a new Sales instance.")
     @RequestMapping(method = RequestMethod.POST)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
@@ -64,7 +69,7 @@ public class SalesController {
     @ApiOperation(value = "Returns the Sales instance associated with the given id.")
     @RequestMapping(value = "/{id:.+}", method = RequestMethod.GET)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
-    public Sales getSales(@PathVariable("id") Integer id) throws EntityNotFoundException {
+    public Sales getSales(@PathVariable("id") Integer id) {
         LOGGER.debug("Getting Sales with id: {}" , id);
 
         Sales foundSales = salesService.getById(id);
@@ -76,7 +81,7 @@ public class SalesController {
     @ApiOperation(value = "Updates the Sales instance associated with the given id.")
     @RequestMapping(value = "/{id:.+}", method = RequestMethod.PUT)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
-    public Sales editSales(@PathVariable("id") Integer id, @RequestBody Sales salesInstance) throws EntityNotFoundException {
+    public Sales editSales(@PathVariable("id") Integer id, @RequestBody Sales salesInstance) {
         LOGGER.debug("Editing Sales with id: {}" , salesInstance.getId());
 
         salesInstance.setId(id);
@@ -89,7 +94,7 @@ public class SalesController {
     @ApiOperation(value = "Deletes the Sales instance associated with the given id.")
     @RequestMapping(value = "/{id:.+}", method = RequestMethod.DELETE)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
-    public boolean deleteSales(@PathVariable("id") Integer id) throws EntityNotFoundException {
+    public boolean deleteSales(@PathVariable("id") Integer id) {
         LOGGER.debug("Deleting Sales with id: {}" , id);
 
         Sales deletedSales = salesService.delete(id);
@@ -105,7 +110,7 @@ public class SalesController {
     @RequestMapping(value = "/search", method = RequestMethod.POST)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Page<Sales> searchSalesByQueryFilters( Pageable pageable, @RequestBody QueryFilter[] queryFilters) {
-        LOGGER.debug("Rendering Sales list");
+        LOGGER.debug("Rendering Sales list by query filter:{}", (Object) queryFilters);
         return salesService.findAll(queryFilters, pageable);
     }
 
@@ -113,7 +118,7 @@ public class SalesController {
     @RequestMapping(method = RequestMethod.GET)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Page<Sales> findSales(@ApiParam("conditions to filter the results") @RequestParam(value = "q", required = false) String query, Pageable pageable) {
-        LOGGER.debug("Rendering Sales list");
+        LOGGER.debug("Rendering Sales list by filter:", query);
         return salesService.findAll(query, pageable);
     }
 
@@ -121,7 +126,7 @@ public class SalesController {
     @RequestMapping(value="/filter", method = RequestMethod.POST, consumes= "application/x-www-form-urlencoded")
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Page<Sales> filterSales(@ApiParam("conditions to filter the results") @RequestParam(value = "q", required = false) String query, Pageable pageable) {
-        LOGGER.debug("Rendering Sales list");
+        LOGGER.debug("Rendering Sales list by filter", query);
         return salesService.findAll(query, pageable);
     }
 
@@ -130,6 +135,14 @@ public class SalesController {
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Downloadable exportSales(@PathVariable("exportType") ExportType exportType, @ApiParam("conditions to filter the results") @RequestParam(value = "q", required = false) String query, Pageable pageable) {
          return salesService.export(exportType, query, pageable);
+    }
+
+    @ApiOperation(value = "Returns a URL to download a file for the data matching the optional query (q) request param and the required fields provided in the Export Options.") 
+    @RequestMapping(value = "/export", method = {RequestMethod.POST}, consumes = "application/json")
+    @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
+    public StringWrapper exportSalesAndGetURL(@RequestBody ExportOptions options, Pageable pageable) {
+        String url = exportedFileManager.registerAndGetURL(Sales.class.getSimpleName() + options.getExportType().getExtension(), outputStream -> salesService.export(options, pageable, outputStream));
+        return new StringWrapper(url);
     }
 
 	@ApiOperation(value = "Returns the total count of Sales instances matching the optional query (q) request param. If query string is too big to fit in GET request's query param, use POST method with application/x-www-form-urlencoded format.")
@@ -159,4 +172,3 @@ public class SalesController {
 	}
 
 }
-

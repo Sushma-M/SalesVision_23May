@@ -19,10 +19,12 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.wavemaker.runtime.data.exception.EntityNotFoundException;
+import com.wavemaker.commons.wrapper.StringWrapper;
+import com.wavemaker.runtime.data.export.ExportOptions;
 import com.wavemaker.runtime.data.export.ExportType;
 import com.wavemaker.runtime.data.expression.QueryFilter;
 import com.wavemaker.runtime.data.model.AggregationInfo;
+import com.wavemaker.runtime.file.manager.ExportedFileManager;
 import com.wavemaker.runtime.file.model.Downloadable;
 import com.wavemaker.tools.api.core.annotations.WMAccessVisibility;
 import com.wavemaker.tools.api.core.models.AccessSpecifier;
@@ -50,6 +52,9 @@ public class EmployeeController {
 	@Qualifier("hrdb.EmployeeService")
 	private EmployeeService employeeService;
 
+	@Autowired
+	private ExportedFileManager exportedFileManager;
+
 	@ApiOperation(value = "Creates a new Employee instance.")
     @RequestMapping(method = RequestMethod.POST)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
@@ -65,7 +70,7 @@ public class EmployeeController {
     @ApiOperation(value = "Returns the Employee instance associated with the given id.")
     @RequestMapping(value = "/{id:.+}", method = RequestMethod.GET)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
-    public Employee getEmployee(@PathVariable("id") Integer id) throws EntityNotFoundException {
+    public Employee getEmployee(@PathVariable("id") Integer id) {
         LOGGER.debug("Getting Employee with id: {}" , id);
 
         Employee foundEmployee = employeeService.getById(id);
@@ -77,7 +82,7 @@ public class EmployeeController {
     @ApiOperation(value = "Updates the Employee instance associated with the given id.")
     @RequestMapping(value = "/{id:.+}", method = RequestMethod.PUT)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
-    public Employee editEmployee(@PathVariable("id") Integer id, @RequestBody Employee employee) throws EntityNotFoundException {
+    public Employee editEmployee(@PathVariable("id") Integer id, @RequestBody Employee employee) {
         LOGGER.debug("Editing Employee with id: {}" , employee.getEid());
 
         employee.setEid(id);
@@ -90,7 +95,7 @@ public class EmployeeController {
     @ApiOperation(value = "Deletes the Employee instance associated with the given id.")
     @RequestMapping(value = "/{id:.+}", method = RequestMethod.DELETE)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
-    public boolean deleteEmployee(@PathVariable("id") Integer id) throws EntityNotFoundException {
+    public boolean deleteEmployee(@PathVariable("id") Integer id) {
         LOGGER.debug("Deleting Employee with id: {}" , id);
 
         Employee deletedEmployee = employeeService.delete(id);
@@ -106,7 +111,7 @@ public class EmployeeController {
     @RequestMapping(value = "/search", method = RequestMethod.POST)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Page<Employee> searchEmployeesByQueryFilters( Pageable pageable, @RequestBody QueryFilter[] queryFilters) {
-        LOGGER.debug("Rendering Employees list");
+        LOGGER.debug("Rendering Employees list by query filter:{}", (Object) queryFilters);
         return employeeService.findAll(queryFilters, pageable);
     }
 
@@ -114,7 +119,7 @@ public class EmployeeController {
     @RequestMapping(method = RequestMethod.GET)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Page<Employee> findEmployees(@ApiParam("conditions to filter the results") @RequestParam(value = "q", required = false) String query, Pageable pageable) {
-        LOGGER.debug("Rendering Employees list");
+        LOGGER.debug("Rendering Employees list by filter:", query);
         return employeeService.findAll(query, pageable);
     }
 
@@ -122,7 +127,7 @@ public class EmployeeController {
     @RequestMapping(value="/filter", method = RequestMethod.POST, consumes= "application/x-www-form-urlencoded")
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Page<Employee> filterEmployees(@ApiParam("conditions to filter the results") @RequestParam(value = "q", required = false) String query, Pageable pageable) {
-        LOGGER.debug("Rendering Employees list");
+        LOGGER.debug("Rendering Employees list by filter", query);
         return employeeService.findAll(query, pageable);
     }
 
@@ -131,6 +136,14 @@ public class EmployeeController {
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Downloadable exportEmployees(@PathVariable("exportType") ExportType exportType, @ApiParam("conditions to filter the results") @RequestParam(value = "q", required = false) String query, Pageable pageable) {
          return employeeService.export(exportType, query, pageable);
+    }
+
+    @ApiOperation(value = "Returns a URL to download a file for the data matching the optional query (q) request param and the required fields provided in the Export Options.") 
+    @RequestMapping(value = "/export", method = {RequestMethod.POST}, consumes = "application/json")
+    @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
+    public StringWrapper exportEmployeesAndGetURL(@RequestBody ExportOptions options, Pageable pageable) {
+        String url = exportedFileManager.registerAndGetURL(Employee.class.getSimpleName() + options.getExportType().getExtension(), outputStream -> employeeService.export(options, pageable, outputStream));
+        return new StringWrapper(url);
     }
 
 	@ApiOperation(value = "Returns the total count of Employee instances matching the optional query (q) request param. If query string is too big to fit in GET request's query param, use POST method with application/x-www-form-urlencoded format.")
@@ -177,4 +190,3 @@ public class EmployeeController {
 	}
 
 }
-

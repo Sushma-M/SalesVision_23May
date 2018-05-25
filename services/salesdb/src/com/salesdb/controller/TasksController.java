@@ -19,10 +19,12 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.wavemaker.runtime.data.exception.EntityNotFoundException;
+import com.wavemaker.commons.wrapper.StringWrapper;
+import com.wavemaker.runtime.data.export.ExportOptions;
 import com.wavemaker.runtime.data.export.ExportType;
 import com.wavemaker.runtime.data.expression.QueryFilter;
 import com.wavemaker.runtime.data.model.AggregationInfo;
+import com.wavemaker.runtime.file.manager.ExportedFileManager;
 import com.wavemaker.runtime.file.model.Downloadable;
 import com.wavemaker.tools.api.core.annotations.WMAccessVisibility;
 import com.wavemaker.tools.api.core.models.AccessSpecifier;
@@ -49,6 +51,9 @@ public class TasksController {
 	@Qualifier("salesdb.TasksService")
 	private TasksService tasksService;
 
+	@Autowired
+	private ExportedFileManager exportedFileManager;
+
 	@ApiOperation(value = "Creates a new Tasks instance.")
     @RequestMapping(method = RequestMethod.POST)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
@@ -64,7 +69,7 @@ public class TasksController {
     @ApiOperation(value = "Returns the Tasks instance associated with the given id.")
     @RequestMapping(value = "/{id:.+}", method = RequestMethod.GET)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
-    public Tasks getTasks(@PathVariable("id") Integer id) throws EntityNotFoundException {
+    public Tasks getTasks(@PathVariable("id") Integer id) {
         LOGGER.debug("Getting Tasks with id: {}" , id);
 
         Tasks foundTasks = tasksService.getById(id);
@@ -76,7 +81,7 @@ public class TasksController {
     @ApiOperation(value = "Updates the Tasks instance associated with the given id.")
     @RequestMapping(value = "/{id:.+}", method = RequestMethod.PUT)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
-    public Tasks editTasks(@PathVariable("id") Integer id, @RequestBody Tasks tasks) throws EntityNotFoundException {
+    public Tasks editTasks(@PathVariable("id") Integer id, @RequestBody Tasks tasks) {
         LOGGER.debug("Editing Tasks with id: {}" , tasks.getId());
 
         tasks.setId(id);
@@ -89,7 +94,7 @@ public class TasksController {
     @ApiOperation(value = "Deletes the Tasks instance associated with the given id.")
     @RequestMapping(value = "/{id:.+}", method = RequestMethod.DELETE)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
-    public boolean deleteTasks(@PathVariable("id") Integer id) throws EntityNotFoundException {
+    public boolean deleteTasks(@PathVariable("id") Integer id) {
         LOGGER.debug("Deleting Tasks with id: {}" , id);
 
         Tasks deletedTasks = tasksService.delete(id);
@@ -105,7 +110,7 @@ public class TasksController {
     @RequestMapping(value = "/search", method = RequestMethod.POST)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Page<Tasks> searchTasksByQueryFilters( Pageable pageable, @RequestBody QueryFilter[] queryFilters) {
-        LOGGER.debug("Rendering Tasks list");
+        LOGGER.debug("Rendering Tasks list by query filter:{}", (Object) queryFilters);
         return tasksService.findAll(queryFilters, pageable);
     }
 
@@ -113,7 +118,7 @@ public class TasksController {
     @RequestMapping(method = RequestMethod.GET)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Page<Tasks> findTasks(@ApiParam("conditions to filter the results") @RequestParam(value = "q", required = false) String query, Pageable pageable) {
-        LOGGER.debug("Rendering Tasks list");
+        LOGGER.debug("Rendering Tasks list by filter:", query);
         return tasksService.findAll(query, pageable);
     }
 
@@ -121,7 +126,7 @@ public class TasksController {
     @RequestMapping(value="/filter", method = RequestMethod.POST, consumes= "application/x-www-form-urlencoded")
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Page<Tasks> filterTasks(@ApiParam("conditions to filter the results") @RequestParam(value = "q", required = false) String query, Pageable pageable) {
-        LOGGER.debug("Rendering Tasks list");
+        LOGGER.debug("Rendering Tasks list by filter", query);
         return tasksService.findAll(query, pageable);
     }
 
@@ -130,6 +135,14 @@ public class TasksController {
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Downloadable exportTasks(@PathVariable("exportType") ExportType exportType, @ApiParam("conditions to filter the results") @RequestParam(value = "q", required = false) String query, Pageable pageable) {
          return tasksService.export(exportType, query, pageable);
+    }
+
+    @ApiOperation(value = "Returns a URL to download a file for the data matching the optional query (q) request param and the required fields provided in the Export Options.") 
+    @RequestMapping(value = "/export", method = {RequestMethod.POST}, consumes = "application/json")
+    @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
+    public StringWrapper exportTasksAndGetURL(@RequestBody ExportOptions options, Pageable pageable) {
+        String url = exportedFileManager.registerAndGetURL(Tasks.class.getSimpleName() + options.getExportType().getExtension(), outputStream -> tasksService.export(options, pageable, outputStream));
+        return new StringWrapper(url);
     }
 
 	@ApiOperation(value = "Returns the total count of Tasks instances matching the optional query (q) request param. If query string is too big to fit in GET request's query param, use POST method with application/x-www-form-urlencoded format.")
@@ -159,4 +172,3 @@ public class TasksController {
 	}
 
 }
-

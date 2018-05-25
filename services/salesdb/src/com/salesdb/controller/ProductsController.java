@@ -19,10 +19,12 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.wavemaker.runtime.data.exception.EntityNotFoundException;
+import com.wavemaker.commons.wrapper.StringWrapper;
+import com.wavemaker.runtime.data.export.ExportOptions;
 import com.wavemaker.runtime.data.export.ExportType;
 import com.wavemaker.runtime.data.expression.QueryFilter;
 import com.wavemaker.runtime.data.model.AggregationInfo;
+import com.wavemaker.runtime.file.manager.ExportedFileManager;
 import com.wavemaker.runtime.file.model.Downloadable;
 import com.wavemaker.tools.api.core.annotations.WMAccessVisibility;
 import com.wavemaker.tools.api.core.models.AccessSpecifier;
@@ -50,6 +52,9 @@ public class ProductsController {
 	@Qualifier("salesdb.ProductsService")
 	private ProductsService productsService;
 
+	@Autowired
+	private ExportedFileManager exportedFileManager;
+
 	@ApiOperation(value = "Creates a new Products instance.")
     @RequestMapping(method = RequestMethod.POST)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
@@ -65,7 +70,7 @@ public class ProductsController {
     @ApiOperation(value = "Returns the Products instance associated with the given id.")
     @RequestMapping(value = "/{id:.+}", method = RequestMethod.GET)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
-    public Products getProducts(@PathVariable("id") Integer id) throws EntityNotFoundException {
+    public Products getProducts(@PathVariable("id") Integer id) {
         LOGGER.debug("Getting Products with id: {}" , id);
 
         Products foundProducts = productsService.getById(id);
@@ -77,7 +82,7 @@ public class ProductsController {
     @ApiOperation(value = "Updates the Products instance associated with the given id.")
     @RequestMapping(value = "/{id:.+}", method = RequestMethod.PUT)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
-    public Products editProducts(@PathVariable("id") Integer id, @RequestBody Products products) throws EntityNotFoundException {
+    public Products editProducts(@PathVariable("id") Integer id, @RequestBody Products products) {
         LOGGER.debug("Editing Products with id: {}" , products.getId());
 
         products.setId(id);
@@ -90,7 +95,7 @@ public class ProductsController {
     @ApiOperation(value = "Deletes the Products instance associated with the given id.")
     @RequestMapping(value = "/{id:.+}", method = RequestMethod.DELETE)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
-    public boolean deleteProducts(@PathVariable("id") Integer id) throws EntityNotFoundException {
+    public boolean deleteProducts(@PathVariable("id") Integer id) {
         LOGGER.debug("Deleting Products with id: {}" , id);
 
         Products deletedProducts = productsService.delete(id);
@@ -106,7 +111,7 @@ public class ProductsController {
     @RequestMapping(value = "/search", method = RequestMethod.POST)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Page<Products> searchProductsByQueryFilters( Pageable pageable, @RequestBody QueryFilter[] queryFilters) {
-        LOGGER.debug("Rendering Products list");
+        LOGGER.debug("Rendering Products list by query filter:{}", (Object) queryFilters);
         return productsService.findAll(queryFilters, pageable);
     }
 
@@ -114,7 +119,7 @@ public class ProductsController {
     @RequestMapping(method = RequestMethod.GET)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Page<Products> findProducts(@ApiParam("conditions to filter the results") @RequestParam(value = "q", required = false) String query, Pageable pageable) {
-        LOGGER.debug("Rendering Products list");
+        LOGGER.debug("Rendering Products list by filter:", query);
         return productsService.findAll(query, pageable);
     }
 
@@ -122,7 +127,7 @@ public class ProductsController {
     @RequestMapping(value="/filter", method = RequestMethod.POST, consumes= "application/x-www-form-urlencoded")
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Page<Products> filterProducts(@ApiParam("conditions to filter the results") @RequestParam(value = "q", required = false) String query, Pageable pageable) {
-        LOGGER.debug("Rendering Products list");
+        LOGGER.debug("Rendering Products list by filter", query);
         return productsService.findAll(query, pageable);
     }
 
@@ -131,6 +136,14 @@ public class ProductsController {
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Downloadable exportProducts(@PathVariable("exportType") ExportType exportType, @ApiParam("conditions to filter the results") @RequestParam(value = "q", required = false) String query, Pageable pageable) {
          return productsService.export(exportType, query, pageable);
+    }
+
+    @ApiOperation(value = "Returns a URL to download a file for the data matching the optional query (q) request param and the required fields provided in the Export Options.") 
+    @RequestMapping(value = "/export", method = {RequestMethod.POST}, consumes = "application/json")
+    @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
+    public StringWrapper exportProductsAndGetURL(@RequestBody ExportOptions options, Pageable pageable) {
+        String url = exportedFileManager.registerAndGetURL(Products.class.getSimpleName() + options.getExportType().getExtension(), outputStream -> productsService.export(options, pageable, outputStream));
+        return new StringWrapper(url);
     }
 
 	@ApiOperation(value = "Returns the total count of Products instances matching the optional query (q) request param. If query string is too big to fit in GET request's query param, use POST method with application/x-www-form-urlencoded format.")
@@ -168,4 +181,3 @@ public class ProductsController {
 	}
 
 }
-

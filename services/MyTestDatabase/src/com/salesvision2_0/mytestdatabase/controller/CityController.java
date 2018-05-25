@@ -19,10 +19,12 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.wavemaker.runtime.data.exception.EntityNotFoundException;
+import com.wavemaker.commons.wrapper.StringWrapper;
+import com.wavemaker.runtime.data.export.ExportOptions;
 import com.wavemaker.runtime.data.export.ExportType;
 import com.wavemaker.runtime.data.expression.QueryFilter;
 import com.wavemaker.runtime.data.model.AggregationInfo;
+import com.wavemaker.runtime.file.manager.ExportedFileManager;
 import com.wavemaker.runtime.file.model.Downloadable;
 import com.wavemaker.tools.api.core.annotations.WMAccessVisibility;
 import com.wavemaker.tools.api.core.models.AccessSpecifier;
@@ -50,6 +52,9 @@ public class CityController {
 	@Qualifier("MyTestDatabase.CityService")
 	private CityService cityService;
 
+	@Autowired
+	private ExportedFileManager exportedFileManager;
+
 	@ApiOperation(value = "Creates a new City instance.")
     @RequestMapping(method = RequestMethod.POST)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
@@ -65,7 +70,7 @@ public class CityController {
     @ApiOperation(value = "Returns the City instance associated with the given id.")
     @RequestMapping(value = "/{id:.+}", method = RequestMethod.GET)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
-    public City getCity(@PathVariable("id") Integer id) throws EntityNotFoundException {
+    public City getCity(@PathVariable("id") Integer id) {
         LOGGER.debug("Getting City with id: {}" , id);
 
         City foundCity = cityService.getById(id);
@@ -77,7 +82,7 @@ public class CityController {
     @ApiOperation(value = "Updates the City instance associated with the given id.")
     @RequestMapping(value = "/{id:.+}", method = RequestMethod.PUT)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
-    public City editCity(@PathVariable("id") Integer id, @RequestBody City cityInstance) throws EntityNotFoundException {
+    public City editCity(@PathVariable("id") Integer id, @RequestBody City cityInstance) {
         LOGGER.debug("Editing City with id: {}" , cityInstance.getId());
 
         cityInstance.setId(id);
@@ -90,7 +95,7 @@ public class CityController {
     @ApiOperation(value = "Deletes the City instance associated with the given id.")
     @RequestMapping(value = "/{id:.+}", method = RequestMethod.DELETE)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
-    public boolean deleteCity(@PathVariable("id") Integer id) throws EntityNotFoundException {
+    public boolean deleteCity(@PathVariable("id") Integer id) {
         LOGGER.debug("Deleting City with id: {}" , id);
 
         City deletedCity = cityService.delete(id);
@@ -106,7 +111,7 @@ public class CityController {
     @RequestMapping(value = "/search", method = RequestMethod.POST)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Page<City> searchCitiesByQueryFilters( Pageable pageable, @RequestBody QueryFilter[] queryFilters) {
-        LOGGER.debug("Rendering Cities list");
+        LOGGER.debug("Rendering Cities list by query filter:{}", (Object) queryFilters);
         return cityService.findAll(queryFilters, pageable);
     }
 
@@ -114,7 +119,7 @@ public class CityController {
     @RequestMapping(method = RequestMethod.GET)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Page<City> findCities(@ApiParam("conditions to filter the results") @RequestParam(value = "q", required = false) String query, Pageable pageable) {
-        LOGGER.debug("Rendering Cities list");
+        LOGGER.debug("Rendering Cities list by filter:", query);
         return cityService.findAll(query, pageable);
     }
 
@@ -122,7 +127,7 @@ public class CityController {
     @RequestMapping(value="/filter", method = RequestMethod.POST, consumes= "application/x-www-form-urlencoded")
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Page<City> filterCities(@ApiParam("conditions to filter the results") @RequestParam(value = "q", required = false) String query, Pageable pageable) {
-        LOGGER.debug("Rendering Cities list");
+        LOGGER.debug("Rendering Cities list by filter", query);
         return cityService.findAll(query, pageable);
     }
 
@@ -131,6 +136,14 @@ public class CityController {
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Downloadable exportCities(@PathVariable("exportType") ExportType exportType, @ApiParam("conditions to filter the results") @RequestParam(value = "q", required = false) String query, Pageable pageable) {
          return cityService.export(exportType, query, pageable);
+    }
+
+    @ApiOperation(value = "Returns a URL to download a file for the data matching the optional query (q) request param and the required fields provided in the Export Options.") 
+    @RequestMapping(value = "/export", method = {RequestMethod.POST}, consumes = "application/json")
+    @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
+    public StringWrapper exportCitiesAndGetURL(@RequestBody ExportOptions options, Pageable pageable) {
+        String url = exportedFileManager.registerAndGetURL(City.class.getSimpleName() + options.getExportType().getExtension(), outputStream -> cityService.export(options, pageable, outputStream));
+        return new StringWrapper(url);
     }
 
 	@ApiOperation(value = "Returns the total count of City instances matching the optional query (q) request param. If query string is too big to fit in GET request's query param, use POST method with application/x-www-form-urlencoded format.")
@@ -168,4 +181,3 @@ public class CityController {
 	}
 
 }
-

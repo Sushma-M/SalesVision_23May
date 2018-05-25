@@ -19,10 +19,12 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.wavemaker.runtime.data.exception.EntityNotFoundException;
+import com.wavemaker.commons.wrapper.StringWrapper;
+import com.wavemaker.runtime.data.export.ExportOptions;
 import com.wavemaker.runtime.data.export.ExportType;
 import com.wavemaker.runtime.data.expression.QueryFilter;
 import com.wavemaker.runtime.data.model.AggregationInfo;
+import com.wavemaker.runtime.file.manager.ExportedFileManager;
 import com.wavemaker.runtime.file.model.Downloadable;
 import com.wavemaker.tools.api.core.annotations.WMAccessVisibility;
 import com.wavemaker.tools.api.core.models.AccessSpecifier;
@@ -51,6 +53,9 @@ public class QuotesController {
 	@Qualifier("salesdb.QuotesService")
 	private QuotesService quotesService;
 
+	@Autowired
+	private ExportedFileManager exportedFileManager;
+
 	@ApiOperation(value = "Creates a new Quotes instance.")
     @RequestMapping(method = RequestMethod.POST)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
@@ -66,7 +71,7 @@ public class QuotesController {
     @ApiOperation(value = "Returns the Quotes instance associated with the given id.")
     @RequestMapping(value = "/{id:.+}", method = RequestMethod.GET)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
-    public Quotes getQuotes(@PathVariable("id") Integer id) throws EntityNotFoundException {
+    public Quotes getQuotes(@PathVariable("id") Integer id) {
         LOGGER.debug("Getting Quotes with id: {}" , id);
 
         Quotes foundQuotes = quotesService.getById(id);
@@ -78,7 +83,7 @@ public class QuotesController {
     @ApiOperation(value = "Updates the Quotes instance associated with the given id.")
     @RequestMapping(value = "/{id:.+}", method = RequestMethod.PUT)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
-    public Quotes editQuotes(@PathVariable("id") Integer id, @RequestBody Quotes quotes) throws EntityNotFoundException {
+    public Quotes editQuotes(@PathVariable("id") Integer id, @RequestBody Quotes quotes) {
         LOGGER.debug("Editing Quotes with id: {}" , quotes.getId());
 
         quotes.setId(id);
@@ -91,7 +96,7 @@ public class QuotesController {
     @ApiOperation(value = "Deletes the Quotes instance associated with the given id.")
     @RequestMapping(value = "/{id:.+}", method = RequestMethod.DELETE)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
-    public boolean deleteQuotes(@PathVariable("id") Integer id) throws EntityNotFoundException {
+    public boolean deleteQuotes(@PathVariable("id") Integer id) {
         LOGGER.debug("Deleting Quotes with id: {}" , id);
 
         Quotes deletedQuotes = quotesService.delete(id);
@@ -107,7 +112,7 @@ public class QuotesController {
     @RequestMapping(value = "/search", method = RequestMethod.POST)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Page<Quotes> searchQuotesByQueryFilters( Pageable pageable, @RequestBody QueryFilter[] queryFilters) {
-        LOGGER.debug("Rendering Quotes list");
+        LOGGER.debug("Rendering Quotes list by query filter:{}", (Object) queryFilters);
         return quotesService.findAll(queryFilters, pageable);
     }
 
@@ -115,7 +120,7 @@ public class QuotesController {
     @RequestMapping(method = RequestMethod.GET)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Page<Quotes> findQuotes(@ApiParam("conditions to filter the results") @RequestParam(value = "q", required = false) String query, Pageable pageable) {
-        LOGGER.debug("Rendering Quotes list");
+        LOGGER.debug("Rendering Quotes list by filter:", query);
         return quotesService.findAll(query, pageable);
     }
 
@@ -123,7 +128,7 @@ public class QuotesController {
     @RequestMapping(value="/filter", method = RequestMethod.POST, consumes= "application/x-www-form-urlencoded")
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Page<Quotes> filterQuotes(@ApiParam("conditions to filter the results") @RequestParam(value = "q", required = false) String query, Pageable pageable) {
-        LOGGER.debug("Rendering Quotes list");
+        LOGGER.debug("Rendering Quotes list by filter", query);
         return quotesService.findAll(query, pageable);
     }
 
@@ -132,6 +137,14 @@ public class QuotesController {
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Downloadable exportQuotes(@PathVariable("exportType") ExportType exportType, @ApiParam("conditions to filter the results") @RequestParam(value = "q", required = false) String query, Pageable pageable) {
          return quotesService.export(exportType, query, pageable);
+    }
+
+    @ApiOperation(value = "Returns a URL to download a file for the data matching the optional query (q) request param and the required fields provided in the Export Options.") 
+    @RequestMapping(value = "/export", method = {RequestMethod.POST}, consumes = "application/json")
+    @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
+    public StringWrapper exportQuotesAndGetURL(@RequestBody ExportOptions options, Pageable pageable) {
+        String url = exportedFileManager.registerAndGetURL(Quotes.class.getSimpleName() + options.getExportType().getExtension(), outputStream -> quotesService.export(options, pageable, outputStream));
+        return new StringWrapper(url);
     }
 
 	@ApiOperation(value = "Returns the total count of Quotes instances matching the optional query (q) request param. If query string is too big to fit in GET request's query param, use POST method with application/x-www-form-urlencoded format.")
@@ -178,4 +191,3 @@ public class QuotesController {
 	}
 
 }
-

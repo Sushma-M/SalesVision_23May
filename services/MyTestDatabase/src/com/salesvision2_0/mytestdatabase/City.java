@@ -7,7 +7,6 @@ import java.io.Serializable;
 import java.util.List;
 import java.util.Objects;
 
-import javax.persistence.CascadeType;
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.FetchType;
@@ -15,7 +14,11 @@ import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.OneToMany;
+import javax.persistence.PostPersist;
 import javax.persistence.Table;
+
+import org.hibernate.annotations.Cascade;
+import org.hibernate.annotations.CascadeType;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
@@ -52,13 +55,21 @@ public class City implements Serializable {
     }
 
     @JsonInclude(Include.NON_EMPTY)
-    @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.REMOVE, mappedBy = "city")
+    @OneToMany(fetch = FetchType.LAZY, mappedBy = "city")
+    @Cascade({CascadeType.SAVE_UPDATE, CascadeType.REMOVE})
     public List<Personnel> getPersonnels() {
         return this.personnels;
     }
 
     public void setPersonnels(List<Personnel> personnels) {
         this.personnels = personnels;
+    }
+
+    @PostPersist
+    public void onPostPersist() {
+        if(personnels != null) {
+            personnels.forEach(personnel -> personnel.setCity(this));
+        }
     }
 
     @Override
@@ -74,4 +85,3 @@ public class City implements Serializable {
         return Objects.hash(getId());
     }
 }
-

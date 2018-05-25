@@ -19,10 +19,12 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.wavemaker.runtime.data.exception.EntityNotFoundException;
+import com.wavemaker.commons.wrapper.StringWrapper;
+import com.wavemaker.runtime.data.export.ExportOptions;
 import com.wavemaker.runtime.data.export.ExportType;
 import com.wavemaker.runtime.data.expression.QueryFilter;
 import com.wavemaker.runtime.data.model.AggregationInfo;
+import com.wavemaker.runtime.file.manager.ExportedFileManager;
 import com.wavemaker.runtime.file.model.Downloadable;
 import com.wavemaker.tools.api.core.annotations.WMAccessVisibility;
 import com.wavemaker.tools.api.core.models.AccessSpecifier;
@@ -51,6 +53,9 @@ public class RepsController {
 	@Qualifier("salesdb.RepsService")
 	private RepsService repsService;
 
+	@Autowired
+	private ExportedFileManager exportedFileManager;
+
 	@ApiOperation(value = "Creates a new Reps instance.")
     @RequestMapping(method = RequestMethod.POST)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
@@ -66,7 +71,7 @@ public class RepsController {
     @ApiOperation(value = "Returns the Reps instance associated with the given id.")
     @RequestMapping(value = "/{id:.+}", method = RequestMethod.GET)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
-    public Reps getReps(@PathVariable("id") Integer id) throws EntityNotFoundException {
+    public Reps getReps(@PathVariable("id") Integer id) {
         LOGGER.debug("Getting Reps with id: {}" , id);
 
         Reps foundReps = repsService.getById(id);
@@ -78,7 +83,7 @@ public class RepsController {
     @ApiOperation(value = "Updates the Reps instance associated with the given id.")
     @RequestMapping(value = "/{id:.+}", method = RequestMethod.PUT)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
-    public Reps editReps(@PathVariable("id") Integer id, @RequestBody Reps reps) throws EntityNotFoundException {
+    public Reps editReps(@PathVariable("id") Integer id, @RequestBody Reps reps) {
         LOGGER.debug("Editing Reps with id: {}" , reps.getId());
 
         reps.setId(id);
@@ -91,7 +96,7 @@ public class RepsController {
     @ApiOperation(value = "Deletes the Reps instance associated with the given id.")
     @RequestMapping(value = "/{id:.+}", method = RequestMethod.DELETE)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
-    public boolean deleteReps(@PathVariable("id") Integer id) throws EntityNotFoundException {
+    public boolean deleteReps(@PathVariable("id") Integer id) {
         LOGGER.debug("Deleting Reps with id: {}" , id);
 
         Reps deletedReps = repsService.delete(id);
@@ -107,7 +112,7 @@ public class RepsController {
     @RequestMapping(value = "/search", method = RequestMethod.POST)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Page<Reps> searchRepsByQueryFilters( Pageable pageable, @RequestBody QueryFilter[] queryFilters) {
-        LOGGER.debug("Rendering Reps list");
+        LOGGER.debug("Rendering Reps list by query filter:{}", (Object) queryFilters);
         return repsService.findAll(queryFilters, pageable);
     }
 
@@ -115,7 +120,7 @@ public class RepsController {
     @RequestMapping(method = RequestMethod.GET)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Page<Reps> findReps(@ApiParam("conditions to filter the results") @RequestParam(value = "q", required = false) String query, Pageable pageable) {
-        LOGGER.debug("Rendering Reps list");
+        LOGGER.debug("Rendering Reps list by filter:", query);
         return repsService.findAll(query, pageable);
     }
 
@@ -123,7 +128,7 @@ public class RepsController {
     @RequestMapping(value="/filter", method = RequestMethod.POST, consumes= "application/x-www-form-urlencoded")
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Page<Reps> filterReps(@ApiParam("conditions to filter the results") @RequestParam(value = "q", required = false) String query, Pageable pageable) {
-        LOGGER.debug("Rendering Reps list");
+        LOGGER.debug("Rendering Reps list by filter", query);
         return repsService.findAll(query, pageable);
     }
 
@@ -132,6 +137,14 @@ public class RepsController {
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Downloadable exportReps(@PathVariable("exportType") ExportType exportType, @ApiParam("conditions to filter the results") @RequestParam(value = "q", required = false) String query, Pageable pageable) {
          return repsService.export(exportType, query, pageable);
+    }
+
+    @ApiOperation(value = "Returns a URL to download a file for the data matching the optional query (q) request param and the required fields provided in the Export Options.") 
+    @RequestMapping(value = "/export", method = {RequestMethod.POST}, consumes = "application/json")
+    @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
+    public StringWrapper exportRepsAndGetURL(@RequestBody ExportOptions options, Pageable pageable) {
+        String url = exportedFileManager.registerAndGetURL(Reps.class.getSimpleName() + options.getExportType().getExtension(), outputStream -> repsService.export(options, pageable, outputStream));
+        return new StringWrapper(url);
     }
 
 	@ApiOperation(value = "Returns the total count of Reps instances matching the optional query (q) request param. If query string is too big to fit in GET request's query param, use POST method with application/x-www-form-urlencoded format.")
@@ -178,4 +191,3 @@ public class RepsController {
 	}
 
 }
-

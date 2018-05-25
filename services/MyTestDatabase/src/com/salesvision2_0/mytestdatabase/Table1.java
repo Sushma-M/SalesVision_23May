@@ -7,7 +7,6 @@ import java.io.Serializable;
 import java.util.List;
 import java.util.Objects;
 
-import javax.persistence.CascadeType;
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.FetchType;
@@ -15,7 +14,11 @@ import javax.persistence.GeneratedValue;
 import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.OneToMany;
+import javax.persistence.PostPersist;
 import javax.persistence.Table;
+
+import org.hibernate.annotations.Cascade;
+import org.hibernate.annotations.CascadeType;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
@@ -52,13 +55,21 @@ public class Table1 implements Serializable {
     }
 
     @JsonInclude(Include.NON_EMPTY)
-    @OneToMany(fetch = FetchType.LAZY, cascade = CascadeType.REMOVE, mappedBy = "table1")
+    @OneToMany(fetch = FetchType.LAZY, mappedBy = "table1")
+    @Cascade({CascadeType.SAVE_UPDATE, CascadeType.REMOVE})
     public List<Table2> getTable2s() {
         return this.table2s;
     }
 
     public void setTable2s(List<Table2> table2s) {
         this.table2s = table2s;
+    }
+
+    @PostPersist
+    public void onPostPersist() {
+        if(table2s != null) {
+            table2s.forEach(table2 -> table2.setTable1(this));
+        }
     }
 
     @Override
@@ -74,4 +85,3 @@ public class Table1 implements Serializable {
         return Objects.hash(getId());
     }
 }
-

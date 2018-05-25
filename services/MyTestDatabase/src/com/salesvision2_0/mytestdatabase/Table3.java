@@ -48,4 +48,3 @@ public class Table3 implements Serializable {
         return Objects.hash(getId());
     }
 }
-

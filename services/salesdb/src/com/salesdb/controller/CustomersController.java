@@ -19,10 +19,12 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.wavemaker.runtime.data.exception.EntityNotFoundException;
+import com.wavemaker.commons.wrapper.StringWrapper;
+import com.wavemaker.runtime.data.export.ExportOptions;
 import com.wavemaker.runtime.data.export.ExportType;
 import com.wavemaker.runtime.data.expression.QueryFilter;
 import com.wavemaker.runtime.data.model.AggregationInfo;
+import com.wavemaker.runtime.file.manager.ExportedFileManager;
 import com.wavemaker.runtime.file.model.Downloadable;
 import com.wavemaker.tools.api.core.annotations.WMAccessVisibility;
 import com.wavemaker.tools.api.core.models.AccessSpecifier;
@@ -50,6 +52,9 @@ public class CustomersController {
 	@Qualifier("salesdb.CustomersService")
 	private CustomersService customersService;
 
+	@Autowired
+	private ExportedFileManager exportedFileManager;
+
 	@ApiOperation(value = "Creates a new Customers instance.")
     @RequestMapping(method = RequestMethod.POST)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
@@ -65,7 +70,7 @@ public class CustomersController {
     @ApiOperation(value = "Returns the Customers instance associated with the given id.")
     @RequestMapping(value = "/{id:.+}", method = RequestMethod.GET)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
-    public Customers getCustomers(@PathVariable("id") Integer id) throws EntityNotFoundException {
+    public Customers getCustomers(@PathVariable("id") Integer id) {
         LOGGER.debug("Getting Customers with id: {}" , id);
 
         Customers foundCustomers = customersService.getById(id);
@@ -77,7 +82,7 @@ public class CustomersController {
     @ApiOperation(value = "Updates the Customers instance associated with the given id.")
     @RequestMapping(value = "/{id:.+}", method = RequestMethod.PUT)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
-    public Customers editCustomers(@PathVariable("id") Integer id, @RequestBody Customers customers) throws EntityNotFoundException {
+    public Customers editCustomers(@PathVariable("id") Integer id, @RequestBody Customers customers) {
         LOGGER.debug("Editing Customers with id: {}" , customers.getId());
 
         customers.setId(id);
@@ -90,7 +95,7 @@ public class CustomersController {
     @ApiOperation(value = "Deletes the Customers instance associated with the given id.")
     @RequestMapping(value = "/{id:.+}", method = RequestMethod.DELETE)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
-    public boolean deleteCustomers(@PathVariable("id") Integer id) throws EntityNotFoundException {
+    public boolean deleteCustomers(@PathVariable("id") Integer id) {
         LOGGER.debug("Deleting Customers with id: {}" , id);
 
         Customers deletedCustomers = customersService.delete(id);
@@ -106,7 +111,7 @@ public class CustomersController {
     @RequestMapping(value = "/search", method = RequestMethod.POST)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Page<Customers> searchCustomersByQueryFilters( Pageable pageable, @RequestBody QueryFilter[] queryFilters) {
-        LOGGER.debug("Rendering Customers list");
+        LOGGER.debug("Rendering Customers list by query filter:{}", (Object) queryFilters);
         return customersService.findAll(queryFilters, pageable);
     }
 
@@ -114,7 +119,7 @@ public class CustomersController {
     @RequestMapping(method = RequestMethod.GET)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Page<Customers> findCustomers(@ApiParam("conditions to filter the results") @RequestParam(value = "q", required = false) String query, Pageable pageable) {
-        LOGGER.debug("Rendering Customers list");
+        LOGGER.debug("Rendering Customers list by filter:", query);
         return customersService.findAll(query, pageable);
     }
 
@@ -122,7 +127,7 @@ public class CustomersController {
     @RequestMapping(value="/filter", method = RequestMethod.POST, consumes= "application/x-www-form-urlencoded")
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Page<Customers> filterCustomers(@ApiParam("conditions to filter the results") @RequestParam(value = "q", required = false) String query, Pageable pageable) {
-        LOGGER.debug("Rendering Customers list");
+        LOGGER.debug("Rendering Customers list by filter", query);
         return customersService.findAll(query, pageable);
     }
 
@@ -131,6 +136,14 @@ public class CustomersController {
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Downloadable exportCustomers(@PathVariable("exportType") ExportType exportType, @ApiParam("conditions to filter the results") @RequestParam(value = "q", required = false) String query, Pageable pageable) {
          return customersService.export(exportType, query, pageable);
+    }
+
+    @ApiOperation(value = "Returns a URL to download a file for the data matching the optional query (q) request param and the required fields provided in the Export Options.") 
+    @RequestMapping(value = "/export", method = {RequestMethod.POST}, consumes = "application/json")
+    @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
+    public StringWrapper exportCustomersAndGetURL(@RequestBody ExportOptions options, Pageable pageable) {
+        String url = exportedFileManager.registerAndGetURL(Customers.class.getSimpleName() + options.getExportType().getExtension(), outputStream -> customersService.export(options, pageable, outputStream));
+        return new StringWrapper(url);
     }
 
 	@ApiOperation(value = "Returns the total count of Customers instances matching the optional query (q) request param. If query string is too big to fit in GET request's query param, use POST method with application/x-www-form-urlencoded format.")
@@ -168,4 +181,3 @@ public class CustomersController {
 	}
 
 }
-

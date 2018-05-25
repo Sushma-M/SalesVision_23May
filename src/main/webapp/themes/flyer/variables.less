@@ -17,7 +17,7 @@
 @brand-primary:         #0D406B;
 @brand-success:         #1e8e2b;
 @brand-info:            #5bc0de;
-@brand-warning:         #cc7d15;
+@brand-warning:         #FFC107;
 @brand-danger:          #d9534f;
 
 @font-face {
@@ -157,7 +157,7 @@
 
 @btn-default-color:              #fff;
 @btn-default-bg:                 #f5873e;
-@btn-default-border:             darken(#f5873e, 5%);
+@btn-default-border:             darken(@btn-default-bg, 5%);
 
 @btn-primary-color:              #fff;
 @btn-primary-bg:                 @brand-primary;
@@ -385,7 +385,7 @@
 @navbar-default-link-hover-color:          #fff;
 @navbar-default-link-hover-bg:             #f5873e;
 @navbar-default-link-active-color:         #fff;
-@navbar-default-link-active-bg:            #153d6c;
+@navbar-default-link-active-bg:            @navbar-default-link-hover-bg;
 @navbar-default-link-disabled-color:       #ccc;
 @navbar-default-link-disabled-bg:          transparent;
 

@@ -1,7 +1,7 @@
 /*global WM,_,google,Application*/
 
-Application.$controller('GooglemapsController', ['$scope', 'Utils', '$element', 'NgMap', '$timeout', '$http', 'wmToaster', 'CONSTANTS', '$compile',
-    function ($s, Utils, $el, NgMap, $timeout, $http, wmToaster, CONSTANTS, $compile) {
+Application.$controller('GooglemapsController', ['$scope', 'Utils', '$element', 'NgMap', '$timeout', '$http', 'wmToaster', 'CONSTANTS', '$compile', '$q',
+    function ($s, Utils, $el, NgMap, $timeout, $http, wmToaster, CONSTANTS, $compile, $q) {
         'use strict';
         var prefabScope,
             _locations = [],
@@ -12,7 +12,6 @@ Application.$controller('GooglemapsController', ['$scope', 'Utils', '$element', 
             lngSum      = 0,
             latNaNCount = 0,
             lngNaNCount = 0,
-            markerIndex = 0,
             infoWindow,
             customMarker,
             customMarkers       = [],
@@ -22,7 +21,7 @@ Application.$controller('GooglemapsController', ['$scope', 'Utils', '$element', 
             _updateDirections,
             _refreshMap,
             _deregisterFns = {'directions': _.noop},
-            invalidMarker  = 0,
+            addressFetchPromises = [],
             heatmap,
             heatmapHidden = false,
             _checkMapStatus;
@@ -165,23 +164,28 @@ Application.$controller('GooglemapsController', ['$scope', 'Utils', '$element', 
             _refreshMap();
         }
 
-        function alterMarkersObject(responseLatLng) {        //alter the already prepared marker object's latlng property
+        function alterMarkersObject(markerIndex, responseLatLng) {        //alter the already prepared marker object's latlng property
             if ($s.markersData[markerIndex]) {
                 $s.markersData[markerIndex].latlng = responseLatLng;
-                markerIndex++;
-            }
-            if (markerIndex >= $s.markersData.length) {
-                setCenter();
             }
         }
+        // removes the improper markers from the model
+        function sanitizeMarkers() {
+            _.remove($s.markersData, function (marker) {
+                return !marker.latlng;
+            });
+            setCenter();
+        }
 
-        function getLatLng(address) {               //this function fetches the lat and lng and constructs the marker Object
-            var lat, lng;
+        function getLatLng(markerIndex, address) {               //this function fetches the lat and lng and constructs the marker Object
+            var lat, lng,
+            addrPromise;
             if (!address) {
-                invalidMarker++;
                 return;
             }
+            addrPromise = $q.defer();
             $http.get('https://maps.googleapis.com/maps/api/geocode/json?address=' + address).then(function (response) {
+                addrPromise.resolve(response);
                 var resultdataSet = response.data.results[0],
                     geometryLocations,
                     latlng;
@@ -190,11 +194,10 @@ Application.$controller('GooglemapsController', ['$scope', 'Utils', '$element', 
                     lat     = geometryLocations.lat;
                     lng     = geometryLocations.lng;
                     latlng  = prepareLatLngData(lat, lng);
-                    alterMarkersObject(latlng);
-                } else {
-                    invalidMarker++;
+                    alterMarkersObject(markerIndex, latlng);
                 }
             });
+            addressFetchPromises.push(addrPromise.promise);
         }
         //selects the activeMarker based on markerindex
         function assignActiveMarker(p) {
@@ -241,7 +244,7 @@ Application.$controller('GooglemapsController', ['$scope', 'Utils', '$element', 
 
         //resets the map and when the binded dataset is empty, sets the defaultCenter
         function resetMap(dataset) {
-            markerIndex = latSum = lngSum = latNaNCount = lngNaNCount = 0;
+            latSum = lngSum = latNaNCount = lngNaNCount = 0;
             $s.heatmapData.length = 0;
             $s.markersData.length = 0;
             assignHeatMapLayers();
@@ -260,59 +263,67 @@ Application.$controller('GooglemapsController', ['$scope', 'Utils', '$element', 
             }
             return true;
         }
+        // adds marker to the markersData model
+        function addMarkerToModel(markerObj) {
+            $s.markersData.push(markerObj);
+        }
         //constructs the marker object
         function constructMarkersModel() {
-            var lat,
-                lng,
-                latlng,
-                address     = '',
-                markerIndex = 0;
+            var markerIndex = 0;
             if (!resetMap(_locations)) {
                 return;
             }
             _.forEach(_locations, function(marker, index) {
+                var lat,
+                    lng,
+                    address = '',
+                    markerObj;
+
                 if (marker === null || !marker) {
                     return;
                 }
+
                 marker.markerIndex = markerIndex;
-                if ($s.markertype === 'Address') {
-                    if (!$s.address) {
-                        return;
-                    }
-                    $s.addressData = $s.address.split(' ');
-                    _.forEach($s.addressData, function(addrValue, index) {
-                        addrValue = Utils.findValueOf(marker, $s.addressData[index]) + ' ';
-                        address += addrValue || '';
-                    });
-                    getLatLng(address);
-                    address = '';
-                } else {
-                    lat = Utils.findValueOf(marker, _lat);
-                    lng = Utils.findValueOf(marker, _lng);
-                    if (!lat || !lng) {
-                        return;
-                    }
-                    latlng = prepareLatLngData(lat, lng);
-                }
-                $s.markersData.push({
-                    'latlng'        : latlng,
+
+                markerObj = {
                     'iconData'      : _icon ? Utils.findValueOf(marker, _icon) : '',
                     'information'   : $s.info ? Utils.findValueOf(marker, $s.info) : '',
                     'id'            : $s.$id + '_' + index,
                     'color'         : $s.shade ? Utils.findValueOf(marker, $s.shade) : '',
                     'radius'        : $s.radius ? Utils.findValueOf(marker, $s.radius) : '',
                     'markerIndex'   : markerIndex
-                });
+                };
+
+                if ($s.markertype === 'Address') {
+                    if (!$s.address) {
+                        return;
+                    }
+                    addMarkerToModel(markerObj);
+                    $s.addressData = $s.address.split(' ');
+                    _.forEach($s.addressData, function(addrValue, index) {
+                        addrValue = Utils.findValueOf(marker, $s.addressData[index]) + ' ';
+                        address += addrValue || '';
+                    });
+                    getLatLng(markerIndex, address);
+                } else {
+                    lat = Utils.findValueOf(marker, _lat);
+                    lng = Utils.findValueOf(marker, _lng);
+                    if (!lat || !lng) {
+                        return;
+                    }
+                    markerObj.latlng = prepareLatLngData(lat, lng);
+                    addMarkerToModel(markerObj);
+                }
                 markerIndex++;
             });
+            $q.all(addressFetchPromises).then(sanitizeMarkers);
         }
 
         function buildMap() {
             if ($s.maptype !== 'Markers') {
                 return;
             }
-            var address = '',
-                paramsExists;
+            var paramsExists;
             if (_locations) {
                 paramsExists = $s.address ? true : (!(!_lat || !_lng));
                 if (!paramsExists) {
@@ -349,8 +360,9 @@ Application.$controller('GooglemapsController', ['$scope', 'Utils', '$element', 
             }
         }
 
-        function assignLocations(dataset, options, columns, wp) {
-            var TypeUtils;
+        function assignLocations(dataset, columns, wp) {
+            var TypeUtils,
+                options;
 
             dataset    = WM.copy(dataset);
             _locations = [];
@@ -393,12 +405,10 @@ Application.$controller('GooglemapsController', ['$scope', 'Utils', '$element', 
 
         function onLocationsChange(newVal) {
 
-            var markerObj,
-                wp = $s.widgetProps,
-                columns = [],
-                options;
+            var wp = $s.widgetProps,
+                columns = [];
             //assign the locations and options
-            assignLocations(newVal, options, columns, wp);
+            assignLocations(newVal, columns, wp);
 
             if ($s.widgetid) {
 
@@ -492,12 +502,11 @@ Application.$controller('GooglemapsController', ['$scope', 'Utils', '$element', 
         //prepare the params necessary for the heat map
         function prepareHeatMapData(newVal) {
             var wp = $s.widgetProps,
-                columns = [],
-                options;
+                columns = [];
             if (!resetMap(newVal)) { //if newVal is empty then reset the map and return
                 return;
             }
-            assignLocations(newVal, options, columns, wp);
+            assignLocations(newVal, columns, wp);
             //if lat lng properties are not assigned do not construct the heatmap model
             if (!_lat || !_lng) {
                 return;
@@ -534,9 +543,9 @@ Application.$controller('GooglemapsController', ['$scope', 'Utils', '$element', 
         function mapTypeOperations(newVal) {
             if ($s.widgetid) {
                 var wp = $s.widgetProps,
-                    markerProps  = ['onMarkerclick', 'onMarkerhover', 'onClick', 'radius', 'shade', 'info', 'icon', 'markertype', 'locations', 'lat', 'lng'],
-                    heatmapProps = ['locations', 'lat', 'lng', 'gradient', 'pixeldensity', 'opacity'],
-                    routeProps   = ['origin', 'destination', 'trafficlayer', 'transitlayer', 'travelmode', 'waypoints', 'stopover'],
+                    markerProps  = ['onMarkerclick', 'onMarkerhover', 'onClick', 'radius', 'shade', 'info', 'icon', 'markertype', 'locations', 'lat', 'lng', 'viewtype'],
+                    heatmapProps = ['locations', 'lat', 'lng', 'gradient', 'pixeldensity', 'opacity', 'viewtype'],
+                    routeProps   = ['origin', 'destination', 'trafficlayer', 'transitlayer', 'travelmode', 'waypoints', 'stopover', 'viewtype'],
                     commonProps  = ['name', 'tabindex', 'maptype', 'zoom', 'height', 'width', 'show', 'animation', 'onLoad', 'onDestroy', 'accessroles', 'class', 'margin', 'active', 'debugurl', 'showindevice'],
                     maptypeProps;
 

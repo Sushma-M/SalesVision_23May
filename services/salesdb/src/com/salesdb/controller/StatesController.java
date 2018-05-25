@@ -19,10 +19,12 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.wavemaker.runtime.data.exception.EntityNotFoundException;
+import com.wavemaker.commons.wrapper.StringWrapper;
+import com.wavemaker.runtime.data.export.ExportOptions;
 import com.wavemaker.runtime.data.export.ExportType;
 import com.wavemaker.runtime.data.expression.QueryFilter;
 import com.wavemaker.runtime.data.model.AggregationInfo;
+import com.wavemaker.runtime.file.manager.ExportedFileManager;
 import com.wavemaker.runtime.file.model.Downloadable;
 import com.wavemaker.tools.api.core.annotations.WMAccessVisibility;
 import com.wavemaker.tools.api.core.models.AccessSpecifier;
@@ -50,6 +52,9 @@ public class StatesController {
 	@Qualifier("salesdb.StatesService")
 	private StatesService statesService;
 
+	@Autowired
+	private ExportedFileManager exportedFileManager;
+
 	@ApiOperation(value = "Creates a new States instance.")
     @RequestMapping(method = RequestMethod.POST)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
@@ -65,7 +70,7 @@ public class StatesController {
     @ApiOperation(value = "Returns the States instance associated with the given id.")
     @RequestMapping(value = "/{id:.+}", method = RequestMethod.GET)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
-    public States getStates(@PathVariable("id") Integer id) throws EntityNotFoundException {
+    public States getStates(@PathVariable("id") Integer id) {
         LOGGER.debug("Getting States with id: {}" , id);
 
         States foundStates = statesService.getById(id);
@@ -77,7 +82,7 @@ public class StatesController {
     @ApiOperation(value = "Updates the States instance associated with the given id.")
     @RequestMapping(value = "/{id:.+}", method = RequestMethod.PUT)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
-    public States editStates(@PathVariable("id") Integer id, @RequestBody States states) throws EntityNotFoundException {
+    public States editStates(@PathVariable("id") Integer id, @RequestBody States states) {
         LOGGER.debug("Editing States with id: {}" , states.getId());
 
         states.setId(id);
@@ -90,7 +95,7 @@ public class StatesController {
     @ApiOperation(value = "Deletes the States instance associated with the given id.")
     @RequestMapping(value = "/{id:.+}", method = RequestMethod.DELETE)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
-    public boolean deleteStates(@PathVariable("id") Integer id) throws EntityNotFoundException {
+    public boolean deleteStates(@PathVariable("id") Integer id) {
         LOGGER.debug("Deleting States with id: {}" , id);
 
         States deletedStates = statesService.delete(id);
@@ -106,7 +111,7 @@ public class StatesController {
     @RequestMapping(value = "/search", method = RequestMethod.POST)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Page<States> searchStatesByQueryFilters( Pageable pageable, @RequestBody QueryFilter[] queryFilters) {
-        LOGGER.debug("Rendering States list");
+        LOGGER.debug("Rendering States list by query filter:{}", (Object) queryFilters);
         return statesService.findAll(queryFilters, pageable);
     }
 
@@ -114,7 +119,7 @@ public class StatesController {
     @RequestMapping(method = RequestMethod.GET)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Page<States> findStates(@ApiParam("conditions to filter the results") @RequestParam(value = "q", required = false) String query, Pageable pageable) {
-        LOGGER.debug("Rendering States list");
+        LOGGER.debug("Rendering States list by filter:", query);
         return statesService.findAll(query, pageable);
     }
 
@@ -122,7 +127,7 @@ public class StatesController {
     @RequestMapping(value="/filter", method = RequestMethod.POST, consumes= "application/x-www-form-urlencoded")
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Page<States> filterStates(@ApiParam("conditions to filter the results") @RequestParam(value = "q", required = false) String query, Pageable pageable) {
-        LOGGER.debug("Rendering States list");
+        LOGGER.debug("Rendering States list by filter", query);
         return statesService.findAll(query, pageable);
     }
 
@@ -131,6 +136,14 @@ public class StatesController {
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Downloadable exportStates(@PathVariable("exportType") ExportType exportType, @ApiParam("conditions to filter the results") @RequestParam(value = "q", required = false) String query, Pageable pageable) {
          return statesService.export(exportType, query, pageable);
+    }
+
+    @ApiOperation(value = "Returns a URL to download a file for the data matching the optional query (q) request param and the required fields provided in the Export Options.") 
+    @RequestMapping(value = "/export", method = {RequestMethod.POST}, consumes = "application/json")
+    @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
+    public StringWrapper exportStatesAndGetURL(@RequestBody ExportOptions options, Pageable pageable) {
+        String url = exportedFileManager.registerAndGetURL(States.class.getSimpleName() + options.getExportType().getExtension(), outputStream -> statesService.export(options, pageable, outputStream));
+        return new StringWrapper(url);
     }
 
 	@ApiOperation(value = "Returns the total count of States instances matching the optional query (q) request param. If query string is too big to fit in GET request's query param, use POST method with application/x-www-form-urlencoded format.")
@@ -168,4 +181,3 @@ public class StatesController {
 	}
 
 }
-

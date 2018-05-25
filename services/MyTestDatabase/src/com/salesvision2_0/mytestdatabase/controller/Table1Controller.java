@@ -19,10 +19,12 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.wavemaker.runtime.data.exception.EntityNotFoundException;
+import com.wavemaker.commons.wrapper.StringWrapper;
+import com.wavemaker.runtime.data.export.ExportOptions;
 import com.wavemaker.runtime.data.export.ExportType;
 import com.wavemaker.runtime.data.expression.QueryFilter;
 import com.wavemaker.runtime.data.model.AggregationInfo;
+import com.wavemaker.runtime.file.manager.ExportedFileManager;
 import com.wavemaker.runtime.file.model.Downloadable;
 import com.wavemaker.tools.api.core.annotations.WMAccessVisibility;
 import com.wavemaker.tools.api.core.models.AccessSpecifier;
@@ -50,6 +52,9 @@ public class Table1Controller {
 	@Qualifier("MyTestDatabase.Table1Service")
 	private Table1Service table1Service;
 
+	@Autowired
+	private ExportedFileManager exportedFileManager;
+
 	@ApiOperation(value = "Creates a new Table1 instance.")
     @RequestMapping(method = RequestMethod.POST)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
@@ -65,7 +70,7 @@ public class Table1Controller {
     @ApiOperation(value = "Returns the Table1 instance associated with the given id.")
     @RequestMapping(value = "/{id:.+}", method = RequestMethod.GET)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
-    public Table1 getTable1(@PathVariable("id") Integer id) throws EntityNotFoundException {
+    public Table1 getTable1(@PathVariable("id") Integer id) {
         LOGGER.debug("Getting Table1 with id: {}" , id);
 
         Table1 foundTable1 = table1Service.getById(id);
@@ -77,7 +82,7 @@ public class Table1Controller {
     @ApiOperation(value = "Updates the Table1 instance associated with the given id.")
     @RequestMapping(value = "/{id:.+}", method = RequestMethod.PUT)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
-    public Table1 editTable1(@PathVariable("id") Integer id, @RequestBody Table1 table1) throws EntityNotFoundException {
+    public Table1 editTable1(@PathVariable("id") Integer id, @RequestBody Table1 table1) {
         LOGGER.debug("Editing Table1 with id: {}" , table1.getId());
 
         table1.setId(id);
@@ -90,7 +95,7 @@ public class Table1Controller {
     @ApiOperation(value = "Deletes the Table1 instance associated with the given id.")
     @RequestMapping(value = "/{id:.+}", method = RequestMethod.DELETE)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
-    public boolean deleteTable1(@PathVariable("id") Integer id) throws EntityNotFoundException {
+    public boolean deleteTable1(@PathVariable("id") Integer id) {
         LOGGER.debug("Deleting Table1 with id: {}" , id);
 
         Table1 deletedTable1 = table1Service.delete(id);
@@ -106,7 +111,7 @@ public class Table1Controller {
     @RequestMapping(value = "/search", method = RequestMethod.POST)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Page<Table1> searchTable1sByQueryFilters( Pageable pageable, @RequestBody QueryFilter[] queryFilters) {
-        LOGGER.debug("Rendering Table1s list");
+        LOGGER.debug("Rendering Table1s list by query filter:{}", (Object) queryFilters);
         return table1Service.findAll(queryFilters, pageable);
     }
 
@@ -114,7 +119,7 @@ public class Table1Controller {
     @RequestMapping(method = RequestMethod.GET)
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Page<Table1> findTable1s(@ApiParam("conditions to filter the results") @RequestParam(value = "q", required = false) String query, Pageable pageable) {
-        LOGGER.debug("Rendering Table1s list");
+        LOGGER.debug("Rendering Table1s list by filter:", query);
         return table1Service.findAll(query, pageable);
     }
 
@@ -122,7 +127,7 @@ public class Table1Controller {
     @RequestMapping(value="/filter", method = RequestMethod.POST, consumes= "application/x-www-form-urlencoded")
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Page<Table1> filterTable1s(@ApiParam("conditions to filter the results") @RequestParam(value = "q", required = false) String query, Pageable pageable) {
-        LOGGER.debug("Rendering Table1s list");
+        LOGGER.debug("Rendering Table1s list by filter", query);
         return table1Service.findAll(query, pageable);
     }
 
@@ -131,6 +136,14 @@ public class Table1Controller {
     @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
     public Downloadable exportTable1s(@PathVariable("exportType") ExportType exportType, @ApiParam("conditions to filter the results") @RequestParam(value = "q", required = false) String query, Pageable pageable) {
          return table1Service.export(exportType, query, pageable);
+    }
+
+    @ApiOperation(value = "Returns a URL to download a file for the data matching the optional query (q) request param and the required fields provided in the Export Options.") 
+    @RequestMapping(value = "/export", method = {RequestMethod.POST}, consumes = "application/json")
+    @WMAccessVisibility(value = AccessSpecifier.APP_ONLY)
+    public StringWrapper exportTable1sAndGetURL(@RequestBody ExportOptions options, Pageable pageable) {
+        String url = exportedFileManager.registerAndGetURL(Table1.class.getSimpleName() + options.getExportType().getExtension(), outputStream -> table1Service.export(options, pageable, outputStream));
+        return new StringWrapper(url);
     }
 
 	@ApiOperation(value = "Returns the total count of Table1 instances matching the optional query (q) request param. If query string is too big to fit in GET request's query param, use POST method with application/x-www-form-urlencoded format.")
@@ -168,4 +181,3 @@ public class Table1Controller {
 	}
 
 }
-
